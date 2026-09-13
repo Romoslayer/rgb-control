@@ -68,6 +68,7 @@ public sealed class MotherboardLighting
     public bool IncludeAddressableHeaders { get; set; } = true;
 
     /// <summary>The color actually sent to the controller.</summary>
+    [JsonIgnore]
     public Rgb EffectiveColor => Rgb.Parse(Color).Scale(Brightness);
 }
 
@@ -83,6 +84,7 @@ public sealed class RamLighting
 
     public EffectSpeed Speed { get; set; } = EffectSpeed.Normal;
 
+    [JsonIgnore]
     public Rgb EffectiveColor => Rgb.Parse(Color).Scale(Brightness);
 }
 

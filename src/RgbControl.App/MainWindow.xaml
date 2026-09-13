@@ -24,11 +24,26 @@
                 <Grid Margin="0,12,0,0" Visibility="{Binding ShowSpeed, Converter={StaticResource BoolToVisibility}}">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="84" />
+                        <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
                     <TextBlock Text="Speed" Style="{StaticResource FieldLabel}" />
                     <ComboBox Grid.Column="1" ItemsSource="{Binding Speeds}" SelectedItem="{Binding Speed}"
+                              IsEnabled="{Binding CanChangeSpeed}"
                               DisplayMemberPath="Label" HorizontalAlignment="Left" MinWidth="200" />
+                    <TextBlock Grid.Column="2" Margin="12,0,0,0" VerticalAlignment="Center"
+                               Text="Pick an animated effect to change speed.">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock" BasedOn="{StaticResource Hint}">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding CanChangeSpeed}" Value="False">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
                 </Grid>
 
                 <StackPanel Visibility="{Binding ShowColor, Converter={StaticResource BoolToVisibility}}">

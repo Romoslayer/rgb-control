@@ -117,12 +117,16 @@ public sealed class DeviceLightingViewModel : ObservableObject
     }
 
     public bool ShowColor => Enabled && Mode.UsesColor;
-    public bool ShowSpeed => Enabled && SupportsSpeed && Mode.IsAnimated;
+
+    /// <summary>Speed stays visible on devices that support it, so it's discoverable; it's only adjustable for animated effects.</summary>
+    public bool ShowSpeed => Enabled && SupportsSpeed;
+    public bool CanChangeSpeed => Mode.IsAnimated;
 
     private void RaiseVisibility()
     {
         OnPropertyChanged(nameof(ShowColor));
         OnPropertyChanged(nameof(ShowSpeed));
+        OnPropertyChanged(nameof(CanChangeSpeed));
     }
 }
 
