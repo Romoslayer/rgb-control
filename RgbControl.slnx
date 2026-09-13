@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/RgbControl.App/RgbControl.App.csproj" />
+    <Project Path="src/RgbControl.Cli/RgbControl.Cli.csproj" />
+    <Project Path="src/RgbControl.Core/RgbControl.Core.csproj" />
+    <Project Path="src/RgbControl.Service/RgbControl.Service.csproj" />
+  </Folder>
+</Solution>

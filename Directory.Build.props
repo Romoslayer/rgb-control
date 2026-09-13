@@ -1,0 +1,11 @@
+<Project>
+  <PropertyGroup>
+    <!-- Overridden at release time from the git tag (scripts/publish.ps1 -Version). -->
+    <Version>1.0.0</Version>
+    <Authors>Romoslayer</Authors>
+    <Product>RGB Control</Product>
+    <Copyright>Copyright © Romoslayer. Licensed under GPL-3.0.</Copyright>
+    <RepositoryUrl>https://github.com/Romoslayer/rgb-control</RepositoryUrl>
+    <PackageLicenseExpression>GPL-3.0-or-later</PackageLicenseExpression>
+  </PropertyGroup>
+</Project>

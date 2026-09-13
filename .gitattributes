@@ -1,0 +1,6 @@
+* text=auto
+
+# Never convert line endings in binaries (the PawnIO module is signed; any change breaks it).
+*.bin binary
+*.ico binary
+*.png binary
