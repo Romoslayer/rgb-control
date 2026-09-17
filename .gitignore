@@ -7,3 +7,6 @@ artifacts/
 
 # Local hardware probe output
 ram-*.txt
+
+# Local project handoff (never publish)
+docs/HANDOFF.md

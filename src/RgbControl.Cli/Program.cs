@@ -2,6 +2,8 @@
 using RgbControl.Core.Aura;
 using RgbControl.Core.Ene;
 using RgbControl.Core.Smbus;
+using RgbControl.Core.Gpu;
+using RgbControl.Core.Gigabyte;
 
 return Run(args);
 
@@ -13,6 +15,35 @@ static int Run(string[] args)
     {
         switch (command)
         {
+            case "gpu-on":
+                var gpuConfig = LightingConfig.Load();
+                foreach (var settings in gpuConfig.Gpus.Where(g => g.Managed))
+                {
+                    if (GpuLightingController.Apply(settings, gpuConfig.AllLightingOff, Console.WriteLine) == 0)
+                        throw new IOException($"Configured GPU not found: {settings.Kind}");
+                }
+                return 0;
+            case "gpu-probe":
+                using (var adl = new AmdAdl())
+                    foreach (var gpu in adl.GetAdapters())
+                    {
+                        Console.WriteLine($"{gpu.Name}: {gpu.Vendor:X4}:{gpu.Device:X4} {gpu.SubVendor:X4}:{gpu.SubDevice:X4}; supported={GpuLightingController.IsSupported(gpu)}");
+                        if (GpuLightingController.IsSupported(gpu))
+                        {
+                            if (gpu.SubVendor == 0x1DA2)
+                                Console.WriteLine($"  Mode: {adl.Read(gpu, 0x28, 0x10, 1)[0]}; external sync: {adl.Read(gpu, 0x28, 0x0F, 1)[0]}");
+                            else
+                                Console.WriteLine($"  Controller signature: {Convert.ToHexString(adl.Read(gpu, 0x22, 0x82, 3))}");
+                        }
+                    }
+                return 0;
+            case "gigabyte-probe":
+                Console.WriteLine($"Motherboard: {GigabyteController.BoardProduct}");
+                using (var board = GigabyteController.TryOpen())
+                {
+                    Console.WriteLine(board is null ? "Supported Gigabyte controller not found." : $"IT5702 firmware: {board.Firmware}; D_LED1 and D_LED2");
+                    return board is null ? 1 : 0;
+                }
             case "probe":
                 return Probe();
             case "on":
@@ -215,6 +246,9 @@ static void PrintHelp()
         rgbctl <command>
 
           probe           Read-only: show controller firmware, config table and channels
+          gpu-probe       Enumerate AMD GPU identities without lighting writes
+          gpu-on          Apply saved settings to managed GPUs only
+          gigabyte-probe  Query Gigabyte board/controller identity without changing lighting
           on              Apply the config file ({LightingConfig.DefaultPath})
           off             Turn all motherboard lighting off
           direct [#RRGGBB] Set a color via direct (software) mode (not saved)

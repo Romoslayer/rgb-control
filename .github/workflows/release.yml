@@ -25,6 +25,10 @@ jobs:
           $version = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME.TrimStart('v') } else { '0.0.0' }
           "value=$version" >> $env:GITHUB_OUTPUT
 
+      - name: Regression checks
+        shell: pwsh
+        run: dotnet run --project tests/RgbControl.Checks/RgbControl.Checks.csproj -c Release
+
       - name: Publish
         shell: pwsh
         run: ./scripts/publish.ps1 -Version ${{ steps.version.outputs.value }}
@@ -43,4 +47,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $installer = (Get-ChildItem artifacts\RgbControl-Setup-*.exe).FullName
-          gh release create $env:GITHUB_REF_NAME $installer --title "RGB Control $env:GITHUB_REF_NAME" --generate-notes
+          $checksum = "$installer.sha256"
+          "{0}  {1}" -f (Get-FileHash $installer -Algorithm SHA256).Hash.ToLowerInvariant(), (Split-Path $installer -Leaf) | Set-Content $checksum
+          $notes = "docs/releases/$($env:GITHUB_REF_NAME.TrimStart('v')).md"
+          $arguments = @('release', 'create', $env:GITHUB_REF_NAME, $installer, $checksum, '--title', "RGB Control $env:GITHUB_REF_NAME")
+          if (Test-Path $notes) { $arguments += @('--notes-file', $notes) } else { $arguments += '--generate-notes' }
+          if ($env:GITHUB_REF_NAME.Contains('-')) { $arguments += '--prerelease' }
+          & gh @arguments
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

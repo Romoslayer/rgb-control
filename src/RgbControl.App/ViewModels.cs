@@ -80,7 +80,13 @@ public sealed class DeviceLightingViewModel : ObservableObject
         _speed = SpeedOption.For(speed ?? EffectSpeed.Normal);
     }
 
-    public IReadOnlyList<ModeOption> Modes => ModeOption.All;
+    public IReadOnlyList<ModeOption> Modes { get; private set; } = ModeOption.All;
+    public void SetSupportedModes(IEnumerable<AuraMode> modes)
+    {
+        Modes = ModeOption.All.Where(m => modes.Contains(m.Mode)).ToList();
+        if (!Modes.Any(m => m.Mode == Mode.Mode)) Mode = Modes[0];
+        OnPropertyChanged(nameof(Modes));
+    }
     public IReadOnlyList<SpeedOption> Speeds => SpeedOption.All;
 
     /// <summary>The Aura USB motherboard protocol has no speed setting; ENE RAM does.</summary>
@@ -132,6 +138,10 @@ public sealed class DeviceLightingViewModel : ObservableObject
 
 public sealed class MotherboardViewModel(MotherboardLighting config) : ObservableObject
 {
+    private MotherboardKind _controller = config.Controller;
+    public IReadOnlyList<MotherboardOption> Controllers { get; } =
+        [new(MotherboardKind.AsusAura, "ASUS Aura"), new(MotherboardKind.GigabyteB650AorusEliteAx, "Gigabyte B650 AORUS Elite AX (experimental)")];
+    public MotherboardKind Controller { get => _controller; set => Set(ref _controller, value); }
     private bool _includeAddressableHeaders = config.IncludeAddressableHeaders;
 
     public DeviceLightingViewModel Lighting { get; } = new(config.Enabled, config.Mode, config.Color, config.Brightness, speed: null);
@@ -142,6 +152,8 @@ public sealed class MotherboardViewModel(MotherboardLighting config) : Observabl
         set => Set(ref _includeAddressableHeaders, value);
     }
 }
+
+public sealed record MotherboardOption(MotherboardKind Kind, string Label);
 
 public sealed class MainViewModel : ObservableObject
 {
@@ -155,6 +167,7 @@ public sealed class MainViewModel : ObservableObject
     private string _serviceStatus = "";
     private bool _serviceRunning;
     private bool _isBusy;
+    private bool _initializing = true;
 
     public MainViewModel()
     {
@@ -174,8 +187,30 @@ public sealed class MainViewModel : ObservableObject
         Ram = new DeviceLightingViewModel(config.Ram.Enabled, config.Ram.Mode, config.Ram.Color, config.Ram.Brightness, config.Ram.Speed);
         _turnOffOnSleep = config.TurnOffOnSleep;
         _turnOffOnShutdown = config.TurnOffOnShutdown;
+        Gpus = Enum.GetValues<GpuKind>().Select(kind => new GpuViewModel(config.Gpus.FirstOrDefault(g => g.Kind == kind)
+            ?? new GpuLighting { Kind = kind })).ToList();
+        foreach (var gpu in Gpus)
+        {
+            gpu.PropertyChanged += (_, _) => ScheduleSave();
+            gpu.Lighting.PropertyChanged += (_, _) => ScheduleSave();
+        }
 
-        Motherboard.PropertyChanged += (_, _) => ScheduleSave();
+        ArgbHeaders = Enumerable.Range(1, Math.Max(3, config.ArgbHeaders.Select(h => h.Header).DefaultIfEmpty(0).Max()))
+            .Select(index => new ArgbHeaderViewModel(config.ArgbHeaders.FirstOrDefault(h => h.Header == index)
+                ?? new ArgbHeaderLighting { Header = index, Name = $"ARGB header {index}" }))
+            .ToList();
+        foreach (var header in ArgbHeaders)
+        {
+            header.PropertyChanged += (_, _) => ScheduleSave();
+            header.Lighting.PropertyChanged += (_, _) => ScheduleSave();
+        }
+
+        Motherboard.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(MotherboardViewModel.Controller)) UpdateMotherboardModes();
+            ScheduleSave();
+        };
+        UpdateMotherboardModes();
         Motherboard.Lighting.PropertyChanged += (_, _) => ScheduleSave();
         Ram.PropertyChanged += (_, _) => ScheduleSave();
 
@@ -192,10 +227,25 @@ public sealed class MainViewModel : ObservableObject
             Ram.Brightness = Motherboard.Lighting.Brightness;
         });
         SaveStartupColorCommand = new RelayCommand(SaveStartupColor, () => !_isBusy);
+        _initializing = false;
     }
 
     public MotherboardViewModel Motherboard { get; }
     public DeviceLightingViewModel Ram { get; }
+    public IReadOnlyList<ArgbHeaderViewModel> ArgbHeaders { get; }
+    public IEnumerable<ArgbHeaderViewModel> VisibleArgbHeaders => Motherboard.Controller == MotherboardKind.GigabyteB650AorusEliteAx
+        ? ArgbHeaders.Where(h => h.Header <= 2) : ArgbHeaders;
+    public IReadOnlyList<GpuViewModel> Gpus { get; }
+
+    private void UpdateMotherboardModes()
+    {
+        var modes = Motherboard.Controller == MotherboardKind.GigabyteB650AorusEliteAx
+            ? new[] { AuraMode.Static, AuraMode.Breathing, AuraMode.Flashing, AuraMode.SpectrumCycle }
+            : ModeOption.All.Select(m => m.Mode).ToArray();
+        Motherboard.Lighting.SetSupportedModes(modes);
+        foreach (var header in ArgbHeaders) header.Lighting.SetSupportedModes(modes);
+        OnPropertyChanged(nameof(VisibleArgbHeaders));
+    }
 
     /// <summary>Master switch (tray and header). Off keeps every device's settings.</summary>
     public bool LightingOn
@@ -278,6 +328,7 @@ public sealed class MainViewModel : ObservableObject
 
     private void ScheduleSave()
     {
+        if (_initializing) return;
         _saveTimer.Stop();
         _saveTimer.Start();
     }
@@ -297,6 +348,7 @@ public sealed class MainViewModel : ObservableObject
         AllLightingOff = !LightingOn,
         Motherboard = new MotherboardLighting
         {
+            Controller = Motherboard.Controller,
             Enabled = Motherboard.Lighting.Enabled,
             Mode = Motherboard.Lighting.Mode.Mode,
             Color = Motherboard.Lighting.Color,
@@ -313,6 +365,8 @@ public sealed class MainViewModel : ObservableObject
         },
         TurnOffOnSleep = TurnOffOnSleep,
         TurnOffOnShutdown = TurnOffOnShutdown,
+        ArgbHeaders = ArgbHeaders.Select(h => h.ToConfig()).ToList(),
+        Gpus = Gpus.Select(g => g.ToConfig()).ToList(),
     };
 
     private void Save()
@@ -332,6 +386,11 @@ public sealed class MainViewModel : ObservableObject
 
     private async void SaveStartupColor()
     {
+        if (Motherboard.Controller != MotherboardKind.AsusAura)
+        {
+            Status = "Saving a startup color to hardware is currently supported only on ASUS. Gigabyte settings apply when the Windows service starts.";
+            return;
+        }
         FlushPendingSave();
         var config = ToConfig();
         _isBusy = true;
@@ -381,6 +440,53 @@ public sealed class MainViewModel : ObservableObject
             ServiceStatus = "Service not installed";
         }
     }
+}
+
+public sealed class GpuViewModel : ObservableObject
+{
+    private bool _managed;
+    private GpuConnection _connection;
+    public GpuViewModel(GpuLighting config)
+    {
+        Kind = config.Kind;
+        _managed = config.Managed;
+        _connection = config.Connection;
+        Lighting = new(config.Enabled, config.Mode, config.Color, config.Brightness, null);
+        Lighting.SetSupportedModes([AuraMode.Static, AuraMode.Rainbow, AuraMode.SpectrumCycle]);
+    }
+    public GpuKind Kind { get; }
+    public string Name => Kind == GpuKind.SapphireNitro9070Xt ? "Sapphire NITRO+ RX 9070 XT" : "PowerColor Red Devil RX 9070 XT";
+    public bool Managed { get => _managed; set => Set(ref _managed, value); }
+    public bool UseArgbCable
+    {
+        get => _connection == GpuConnection.ArgbCable;
+        set { _connection = value ? GpuConnection.ArgbCable : GpuConnection.Direct; OnPropertyChanged(); OnPropertyChanged(nameof(UseDirect)); }
+    }
+    public bool UseDirect => !UseArgbCable;
+    public DeviceLightingViewModel Lighting { get; }
+    public GpuLighting ToConfig() => new()
+    {
+        Kind = Kind, Managed = Managed, Connection = _connection, Enabled = Lighting.Enabled,
+        Mode = Lighting.Mode.Mode, Color = Lighting.Color, Brightness = Lighting.Brightness,
+    };
+}
+
+public sealed class ArgbHeaderViewModel(ArgbHeaderLighting config) : ObservableObject
+{
+    private string _name = config.Name;
+    private bool _useCustomSettings = config.UseCustomSettings;
+    public int Header { get; } = config.Header;
+    public string HeaderLabel => $"ARGB header {Header}";
+    public string Name { get => _name; set => Set(ref _name, value); }
+    public bool UseCustomSettings { get => _useCustomSettings; set => Set(ref _useCustomSettings, value); }
+    public DeviceLightingViewModel Lighting { get; } = new(config.Enabled, config.Mode, config.Color, config.Brightness, null);
+
+    public ArgbHeaderLighting ToConfig() => new()
+    {
+        Header = Header, Name = Name, UseCustomSettings = UseCustomSettings,
+        Enabled = Lighting.Enabled, Mode = Lighting.Mode.Mode,
+        Color = Lighting.Color, Brightness = Lighting.Brightness,
+    };
 }
 
 public sealed class RelayCommand(Action execute, Func<bool>? canExecute = null) : ICommand

@@ -8,7 +8,6 @@ public sealed class LightingWorker(LightingManager manager, ILogger<LightingWork
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         logger.LogInformation("Starting; config at {Path}", LightingConfig.DefaultPath);
-        await manager.ApplyOnAsync(TimeSpan.FromMinutes(2), stoppingToken);
 
         var directory = Path.GetDirectoryName(LightingConfig.DefaultPath)!;
         Directory.CreateDirectory(directory);
@@ -22,6 +21,9 @@ public sealed class LightingWorker(LightingManager manager, ILogger<LightingWork
         watcher.Changed += (_, _) => changed.Release();
         watcher.Created += (_, _) => changed.Release();
         watcher.Renamed += (_, _) => changed.Release();
+
+        // Watch before startup retries so edits made while a device is unavailable aren't missed.
+        await manager.ApplyOnAsync(TimeSpan.FromMinutes(2), stoppingToken);
 
         while (!stoppingToken.IsCancellationRequested)
         {

@@ -4,6 +4,11 @@ A lightweight, open-source replacement for vendor RGB software on Windows. It co
 motherboard lighting and **ENE-based RGB RAM** (such as G.Skill Trident Z5 RGB) without Armoury Crate,
 iCUE or G.Skill's lighting app.
 
+Version 1.1.0 adds experimental separate ARGB-header settings (including
+NZXT Kraken Core lighting), Sapphire NITRO+ / PowerColor Red Devil RX 9070 XT direct GPU control,
+and Gigabyte B650 AORUS Elite AX control. See [hardware support and validation status](docs/hardware-support.md).
+These additions have not yet completed hardware power-cycle testing.
+
 - Lighting is applied by a Windows service **at boot, before you sign in**.
 - Lighting turns **off at shutdown and sleep**, and back on when the PC wakes. The board no longer
   lights up your room at night.
@@ -61,12 +66,18 @@ RAM lighting chips share the SMBus with each DIMM's SPD and power-management chi
 Settings live in `C:\ProgramData\RgbControl\config.json`; the service re-applies them whenever the file
 changes. Service logs are in **Event Viewer > Windows Logs > Application**, source `RgbControl`.
 
+Changes in the app save automatically and are restored by the service at Windows startup and wake.
+No separate save is needed. Enable shutdown/sleep off to turn managed lighting off at those times.
+The ASUS-only "Save startup color" option writes motherboard settings for the period before Windows
+starts; it is separate from automatic saving and is not available for the new GPU or Gigabyte controls.
+
 ## Building from source
 
 Requires the .NET 10 SDK.
 
 ```powershell
 dotnet build RgbControl.slnx
+dotnet run --project tests/RgbControl.Checks/RgbControl.Checks.csproj
 .\scripts\install-service.ps1        # admin PowerShell: builds and installs locally
 ```
 
@@ -76,6 +87,8 @@ Useful CLI commands (`src\RgbControl.Cli`):
 rgbctl probe                    # read-only motherboard controller info
 rgbctl set static "#FF0000"     # temporary motherboard effect
 rgbctl ram-probe                # read-only RAM scan (admin)
+rgbctl gpu-probe                # read-only supported AMD GPU state
+rgbctl gigabyte-probe           # read-only Gigabyte controller identity
 rgbctl ram-set breathing "#0060FF"   # temporary RAM effect (admin)
 ```
 

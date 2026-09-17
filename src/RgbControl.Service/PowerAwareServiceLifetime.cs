@@ -29,6 +29,7 @@ public sealed class PowerAwareServiceLifetime : WindowsServiceLifetime
 
     protected override void OnShutdown()
     {
+        _manager.MarkSuspended(true);
         if (_manager.LoadConfig().TurnOffOnShutdown)
         {
             _manager.TurnOff("shutdown");

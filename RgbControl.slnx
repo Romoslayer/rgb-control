@@ -5,4 +5,7 @@
     <Project Path="src/RgbControl.Core/RgbControl.Core.csproj" />
     <Project Path="src/RgbControl.Service/RgbControl.Service.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/RgbControl.Checks/RgbControl.Checks.csproj" />
+  </Folder>
 </Solution>

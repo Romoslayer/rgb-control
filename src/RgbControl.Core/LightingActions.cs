@@ -10,14 +10,43 @@ public static class LightingActions
     /// <summary>Shows the configured effect. Not saved to the controller, so a power loss falls back to its saved state.</summary>
     public static void ApplyOn(AuraUsbController aura, LightingConfig config)
     {
-        var board = config.Motherboard;
-        if (config.AllLightingOff || !board.Enabled)
+        if (config.AllLightingOff)
         {
             ApplyOff(aura);
             return;
         }
 
-        Apply(aura, board.Mode, board.EffectiveColor, board.IncludeAddressableHeaders);
+        ApplyConfiguredMotherboard(aura, config);
+    }
+
+    private static void ApplyConfiguredMotherboard(AuraUsbController aura, LightingConfig config)
+    {
+        aura.Initialize();
+        var header = 0;
+        foreach (var channel in aura.Channels)
+        {
+            var setting = ResolveChannel(config, channel.Type == AuraChannelType.Addressable ? ++header : 0);
+            if (setting is { } effect)
+                aura.SetEffect(channel, effect.Mode, effect.Color);
+        }
+    }
+
+    /// <summary>Header 0 is onboard; a null result leaves an unmanaged header alone.</summary>
+    public static (AuraMode Mode, Rgb Color)? ResolveChannel(LightingConfig config, int header)
+    {
+        if (config.AllLightingOff)
+            return (AuraMode.Off, Rgb.Black);
+
+        var custom = config.ArgbHeaders.FirstOrDefault(h => h.Header == header && h.UseCustomSettings);
+        if (header > 0 && custom is not null)
+            return custom.Enabled ? (custom.Mode, custom.EffectiveColor) : (AuraMode.Off, Rgb.Black);
+
+        var board = config.Motherboard;
+        if (!board.Enabled)
+            return (AuraMode.Off, Rgb.Black);
+        if (header > 0 && !board.IncludeAddressableHeaders)
+            return null;
+        return (board.Mode, board.EffectiveColor);
     }
 
     public static void ApplyOff(AuraUsbController aura) => Apply(aura, AuraMode.Off, Rgb.Black, includeAddressable: true);
@@ -65,15 +94,9 @@ public static class LightingActions
     /// </summary>
     public static void SaveToHardware(AuraUsbController aura, LightingConfig config)
     {
-        var board = config.Motherboard;
-        if (board.Enabled)
-        {
-            Apply(aura, board.Mode, board.EffectiveColor, board.IncludeAddressableHeaders);
-        }
-        else
-        {
-            ApplyOff(aura);
-        }
+        // Store the configured startup look even while the runtime master switch is off.
+        var startup = new LightingConfig { Motherboard = config.Motherboard, ArgbHeaders = config.ArgbHeaders };
+        ApplyConfiguredMotherboard(aura, startup);
 
         foreach (var channel in aura.Channels.Where(c => c.Type == AuraChannelType.Onboard))
         {

@@ -25,6 +25,10 @@ public sealed class LightingConfig
 
     public RamLighting Ram { get; set; } = new();
 
+    /// <summary>Optional per-header overrides. Missing entries retain the motherboard's legacy behavior.</summary>
+    public List<ArgbHeaderLighting> ArgbHeaders { get; set; } = [];
+    public List<GpuLighting> Gpus { get; set; } = [];
+
     /// <summary>Turn lighting off when the PC goes to sleep, and back on when it wakes.</summary>
     public bool TurnOffOnSleep { get; set; } = true;
 
@@ -55,8 +59,38 @@ public sealed class LightingConfig
     }
 }
 
+public sealed class ArgbHeaderLighting
+{
+    /// <summary>One-based index among the controller's addressable headers.</summary>
+    public int Header { get; set; } = 1;
+    public string Name { get; set; } = "ARGB device";
+    public bool UseCustomSettings { get; set; }
+    public bool Enabled { get; set; } = true;
+    public AuraMode Mode { get; set; } = AuraMode.Static;
+    public string Color { get; set; } = "#FFFFFF";
+    public int Brightness { get; set; } = 100;
+
+    [JsonIgnore]
+    public Rgb EffectiveColor => Rgb.Parse(Color).Scale(Brightness);
+}
+
+public enum GpuKind { SapphireNitro9070Xt, PowerColorRedDevil9070Xt }
+public enum GpuConnection { Direct, ArgbCable }
+
+public sealed class GpuLighting
+{
+    public GpuKind Kind { get; set; }
+    public bool Managed { get; set; }
+    public bool Enabled { get; set; } = true;
+    public GpuConnection Connection { get; set; }
+    public AuraMode Mode { get; set; } = AuraMode.Static;
+    public string Color { get; set; } = "#FFFFFF";
+    public int Brightness { get; set; } = 100;
+}
+
 public sealed class MotherboardLighting
 {
+    public MotherboardKind Controller { get; set; } = MotherboardKind.AsusAura;
     public bool Enabled { get; set; } = true;
     public AuraMode Mode { get; set; } = AuraMode.Static;
     public string Color { get; set; } = "#FFFFFF";
@@ -71,6 +105,8 @@ public sealed class MotherboardLighting
     [JsonIgnore]
     public Rgb EffectiveColor => Rgb.Parse(Color).Scale(Brightness);
 }
+
+public enum MotherboardKind { AsusAura, GigabyteB650AorusEliteAx }
 
 /// <summary>ENE-based RGB DRAM (e.g. G.Skill Trident Z5 RGB). Uses the same effect numbering as Aura.</summary>
 public sealed class RamLighting

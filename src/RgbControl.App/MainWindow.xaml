@@ -135,15 +135,68 @@
                             <CheckBox DockPanel.Dock="Right" IsChecked="{Binding Lighting.Enabled}" Content="On" />
                             <StackPanel>
                                 <TextBlock Text="Motherboard" Style="{StaticResource CardTitle}" />
-                                <TextBlock Text="ASUS Aura onboard lighting" Style="{StaticResource Hint}" />
+                                <TextBlock Text="Onboard lighting and RGB headers" Style="{StaticResource Hint}" />
                             </StackPanel>
                         </DockPanel>
+                        <ComboBox Margin="0,12,0,0" ItemsSource="{Binding Controllers}"
+                                  SelectedValue="{Binding Controller}" SelectedValuePath="Kind" DisplayMemberPath="Label" />
                         <ContentControl Content="{Binding Lighting}" ContentTemplate="{StaticResource LightingBody}" />
                         <CheckBox Margin="0,12,0,0" IsChecked="{Binding IncludeAddressableHeaders}"
                                   IsEnabled="{Binding Lighting.Enabled}"
-                                  Content="Also apply to the ARGB headers" />
+                                  Content="Also apply to headers without custom settings" />
                     </StackPanel>
                 </Border>
+
+                <Border Style="{StaticResource Card}" IsEnabled="{Binding LightingOn}">
+                    <StackPanel>
+                        <TextBlock Text="ARGB devices" Style="{StaticResource CardTitle}" />
+                        <TextBlock Margin="0,4,0,12" Style="{StaticResource Hint}"
+                                   Text="For Kraken Core pump/fan lighting and GPUs connected by a 5V ARGB cable. These are header settings, not detected devices. Only configure headers your board has. Devices sharing a header share its effect." />
+                        <ItemsControl ItemsSource="{Binding VisibleArgbHeaders}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Margin="0,8,0,16">
+                                        <TextBlock Text="{Binding HeaderLabel}" FontWeight="SemiBold" />
+                                        <CheckBox Margin="0,8,0,0" Content="Use separate lighting settings"
+                                                  IsChecked="{Binding UseCustomSettings}" />
+                                        <StackPanel Visibility="{Binding UseCustomSettings, Converter={StaticResource BoolToVisibility}}">
+                                            <TextBlock Text="Device label" Style="{StaticResource Hint}" Margin="0,10,0,4" />
+                                            <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" />
+                                            <CheckBox Margin="0,10,0,0" Content="Lighting on" IsChecked="{Binding Lighting.Enabled}" />
+                                            <ContentControl Content="{Binding Lighting}" ContentTemplate="{StaticResource LightingBody}" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+
+                <ItemsControl ItemsSource="{Binding Gpus}" IsEnabled="{Binding LightingOn}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Style="{StaticResource Card}">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding Name}" Style="{StaticResource CardTitle}" />
+                                    <TextBlock Margin="0,4,0,8" Text="Experimental support — enable only on a PC with this card."
+                                               Style="{StaticResource Hint}" />
+                                    <CheckBox Content="Control this GPU" IsChecked="{Binding Managed}" />
+                                    <StackPanel Visibility="{Binding Managed, Converter={StaticResource BoolToVisibility}}">
+                                        <CheckBox Margin="0,12,0,0" Content="Use motherboard ARGB cable instead of direct control"
+                                                  IsChecked="{Binding UseArgbCable}" />
+                                        <TextBlock Margin="0,6,0,0" Style="{StaticResource Hint}"
+                                                   Visibility="{Binding UseArgbCable, Converter={StaticResource BoolToVisibility}}"
+                                                   Text="Connect the GPU's 5V ARGB cable and configure its header above. The app will request external sync. If direct communication is unavailable, enable external sync in TriXX or Keystone, then disable Control this GPU here; the header still works." />
+                                        <StackPanel Visibility="{Binding UseDirect, Converter={StaticResource BoolToVisibility}}">
+                                            <CheckBox Margin="0,12,0,0" Content="Lighting on" IsChecked="{Binding Lighting.Enabled}" />
+                                            <ContentControl Content="{Binding Lighting}" ContentTemplate="{StaticResource LightingBody}" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
 
                 <!-- RAM -->
                 <Border Style="{StaticResource Card}" IsEnabled="{Binding LightingOn}">
@@ -174,7 +227,7 @@
 
                         <TextBlock Text="Startup color" FontWeight="SemiBold" />
                         <TextBlock Margin="0,4,0,10" Style="{StaticResource Hint}"
-                                   Text="Stores the motherboard effect in the controller so it shows during startup, and keeps the board dark while the PC is off. Only needed after changing the motherboard color." />
+                                   Text="ASUS only: stores motherboard and header effects for startup, and keeps onboard lighting off after shutdown. Gigabyte and direct GPU settings are applied by the service after Windows starts." />
                         <Button HorizontalAlignment="Left" Command="{Binding SaveStartupColorCommand}"
                                 Content="Save startup color to motherboard" />
                     </StackPanel>
